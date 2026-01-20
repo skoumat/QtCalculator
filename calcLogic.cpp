@@ -253,6 +253,8 @@ void CalcLogic::calculate()
     emit calculationStringChanged();
 }
 
+// test
+
 int CalcLogic::calculateRec(int startIndexVal, int endIndexVal, int startIndexOp) {
     int deletedValues = 0;
     for (int i = startIndexOp; i < storedOperands.size(); i++){
