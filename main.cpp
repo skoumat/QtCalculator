@@ -3,7 +3,7 @@
 #include <QQuickView>
 #include <QQmlContext>
 
-#include "calcLogic.h"
+#include "CalcLogic.h"
 
 int main(int argc, char *argv[])
 {

@@ -25,6 +25,10 @@ void CalcLogic::insertDigit(int digit)
         planDeleteCalculation = false;
     }
 
+    if (!storedOperands.empty() && storedOperands.back() == ")"){
+        return;
+    }
+
     if (decimalCounter > 0){
         currentNumber += digit / std::pow(10.0, decimalCounter);
         decimalCounter++;
@@ -74,25 +78,44 @@ void CalcLogic::insertParth(const QString &par){
     }
 
     if(par == "("){
+        if (!lastWas.empty() && storedOperands[storedOperands.size() - 1] == ")"){ // zabranuje "...) ( "
+            return;
+        }
+        if (!lastWas.empty() && (lastWas.back() == DP || lastWas.back() == DIGIT)){ // umoznuje "(" na zacatku
+            return;
+        }
+
         neededClosedPar++;
     }
 
     if (par == ")"){
+        //if(lastWas.back() == OPERAND){
+        //    calculationString_private.append(QString::number(currentNumber));
+        //    emit calculationStringChanged();
+        //    pushCurrentNumber();
+        //}
+
+        //if(lastWas.back() == PARTH && storedOperands.back() == "("){
+        //    storedValues.push_back(currentNumber);
+        //    calculationString_private.append(QString::number(currentNumber));
+        //    emit calculationStringChanged();
+        //}
+
         neededClosedPar--;
     }
 
-    storedOperands.push_back(par);
-
-    if (par == ")" && !isCurrentNumberPushed){
+    if (par == ")" && !isCurrentNumberPushed && storedOperands[storedOperands.size() - 1] != ")"){ // zabranuje ..4) 4 +
         calculationString_private.append(QString::number(currentNumber));
 
-        pushCurrentNumber();
+        pushAndResetCurrentNumber();
 
         isCurrentNumberPushed = true;
     }
+
     calculationString_private.append(whiteChar + par + whiteChar);
     emit calculationStringChanged();
 
+    storedOperands.push_back(par);
     lastWas.push_back(PARTH);
 }
 
@@ -104,22 +127,19 @@ void CalcLogic::insertOperation(const QString &op)
         planDeleteCalculation = false;
     }
 
-    if (!storedOperands.empty() && !storedValues.empty() && storedOperands.back() == DIV && storedValues.back() == 0) {
-        currentNumberString_private = "Error: division by zero";
-        storedValues.pop_back();
-        decimalHistory.pop_back();
-
-        emit currentNumberStringChanged();
+    if (isDivisionByZeroFromCurrentNum()) {
         return;
     }
 
     if (!isCurrentNumberPushed){
         calculationString_private.append(QString::number(currentNumber) + whiteChar + op + whiteChar);
 
-        pushCurrentNumber();
+        pushAndResetCurrentNumber();
+        isCurrentNumberPushed = false;
     }
     else {
         calculationString_private.append(whiteChar + op + whiteChar);
+        isCurrentNumberPushed = false;
     }
 
     storedOperands.push_back(op);
@@ -130,7 +150,7 @@ void CalcLogic::insertOperation(const QString &op)
     justDeleted = false;
 }
 
-void CalcLogic::pushCurrentNumber(){
+void CalcLogic::pushAndResetCurrentNumber(){
     storedValues.push_back(currentNumber);
     currentNumber = 0;
     currentNumberChanged();
@@ -139,6 +159,26 @@ void CalcLogic::pushCurrentNumber(){
     decimalCounter = 0;
 }
 
+bool CalcLogic::isDivisionByZeroFromCurrentNum(){
+    if (!storedOperands.empty() && !storedValues.empty() && storedOperands.back() == DIV && isDivisionByZero(currentNumber)) {
+        storedValues.pop_back();
+        decimalHistory.pop_back();
+
+        return true;
+    }
+
+    return false;
+}
+
+bool CalcLogic::isDivisionByZero(double divisor){
+    if (divisor == 0) {
+        currentNumberString_private = "Error: division by zero";
+        emit currentNumberStringChanged();
+        return true;
+    }
+
+    return false;
+}
 
 void CalcLogic::backspace(){
     if(lastWas.empty()){
@@ -147,6 +187,7 @@ void CalcLogic::backspace(){
 
     if (lastWas.back() == Items::PARTH){
         storedOperands.pop_back();
+        neededClosedPar--;
         calculationString_private.chop(3);
         emit calculationStringChanged();
 
@@ -215,6 +256,8 @@ void CalcLogic::restoreCurrentNumber(){
     decimalCounter = decimalHistory.back();
     decimalHistory.pop_back();
 
+    isCurrentNumberPushed = false;
+
     calculationString_private.chop(numDigits(currentNumber * std::pow(10.0, decimalCounter)));
 
     emit calculationStringChanged();
@@ -226,7 +269,9 @@ void CalcLogic::calculate()
         return;
     }
 
-    // co kdyz ) 4444
+    if (isDivisionByZeroFromCurrentNum()) {
+        return;
+    }
 
     planDeleteCalculation = true;
 
@@ -234,41 +279,53 @@ void CalcLogic::calculate()
         calculationString_private.append(" =");
     }
     else{
-        storedValues.push_back(currentNumber);
         calculationString_private.append(QString::number(currentNumber) + " =");
+        pushAndResetCurrentNumber();
     }
 
 
-    calculateRec(0, storedValues.size() - 1, 0);
-
-    currentNumber = storedValues[0];
-    currentNumberChanged();
+    double deletedValues = calculateRec(0, storedValues.size() - 1, 0);
+    if(deletedValues >= 0){
+        currentNumber = storedValues[0];
+        currentNumberChanged();
+    }
 
     storedValues.clear();
     storedOperands.clear();
     lastWas.clear();
     decimalHistory.clear();
     justDeleted = false;
-
-    emit calculationStringChanged();
+    isCurrentNumberPushed = false;
 }
 
-// test
 
 int CalcLogic::calculateRec(int startIndexVal, int endIndexVal, int startIndexOp) {
     int deletedValues = 0;
+    int actualOps = 0;
     for (int i = startIndexOp; i < storedOperands.size(); i++){
         if (storedOperands[i] == "("){
-            deletedValues = calculateRec(startIndexVal+i, endIndexVal, i+1);
+            deletedValues = calculateRec(startIndexVal+actualOps, endIndexVal, i+1);
+            if(deletedValues < 0){
+                return deletedValues;
+            }
+
             storedOperands.erase(storedOperands.begin() + i);
         }
-        if (storedOperands[i] == ")"){
+        else if (storedOperands[i] == ")"){
             storedOperands.erase(storedOperands.begin() + i);
-            endIndexVal = i - 1;
+            break;
+        }
+        else{
+            actualOps++;
         }
     }
 
-    deletedValues += calculateMultAndDiv(startIndexVal, endIndexVal - deletedValues, startIndexOp);
+    int newDeletedValues = calculateMultAndDiv(startIndexVal, endIndexVal - deletedValues, startIndexOp);
+    if(newDeletedValues < 0){
+        return newDeletedValues;
+    }
+
+    deletedValues += newDeletedValues;
 
     if(storedOperands.size() == 0){
         return 0;
@@ -284,11 +341,15 @@ int CalcLogic::calculateMultAndDiv(int startIndexVal, int endIndexVal, int start
 
     for(; startIndexVal < endIndexVal; startIndexVal++){
         if(storedOperands[startIndexOp] == MULT || storedOperands[startIndexOp] == DIV){
+            double nextNumber = storedValues[startIndexVal+1];
             if(storedOperands[startIndexOp] == MULT){
-                storedValues[startIndexVal] *= storedValues[startIndexVal+1];
+                storedValues[startIndexVal] *= nextNumber;
             }
             else{
-                storedValues[startIndexVal] /= storedValues[startIndexVal+1];
+                if (isDivisionByZero(nextNumber)){
+                    return -1;
+                }
+                storedValues[startIndexVal] /= nextNumber;
             }
 
             storedOperands.erase(storedOperands.begin() + startIndexOp);
@@ -336,6 +397,7 @@ void CalcLogic::clear()
     lastWas.clear();
     neededClosedPar = 0;
     justDeleted = false;
+    isCurrentNumberPushed = false;
 
     calculationString_private = "";
     emit calculationStringChanged();

@@ -15,16 +15,21 @@ RoundButton  {
     Layout.maximumHeight: Layout.maximumWidth
 
     Layout.fillWidth: true
-    Layout.fillHeight: true
 
     background: Rectangle {
         radius: 10
-        color: focus ? "grey" : "darkslategrey"
+        color: focus ? "grey" : "darkslategrey" // TODO: not working
     }
 
+    contentItem: Text {
+            text: parent.text
+            font.pointSize: Qt.platform.os === "android" ? 25 : 16
+            color: "white"
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
 
-
-    //onFocusChanged:
+    //onFocusChanged: // TODO:
 
 
 }

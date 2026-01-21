@@ -59,8 +59,10 @@ private:
     std::vector<QString> storedOperands;
     std::vector<int> decimalHistory;
 
+    bool isDivisionByZeroFromCurrentNum();
+    bool isDivisionByZero(double);
     int calculateRec(int, int, int);
-    void pushCurrentNumber();
+    void pushAndResetCurrentNumber();
     void currentNumberChanged();
     void restoreCurrentNumber();
     int calculateMultAndDiv(int, int, int);
