@@ -10,7 +10,8 @@ enum Items{
     DIGIT = 1,
     OPERAND = 2,
     DP = 3,
-    PARTH = 4
+    PARTH = 4,
+    NUMBER = 5
 };
 
 inline std::string ADD = "+";
@@ -43,7 +44,7 @@ signals:
     void currentNumberStringChanged();
 
 private:
-    char whiteChar = '.';
+    char whiteChar = '_';
     int decimalCounter = 0;
     double currentNumber = 0;
     bool isCurrentNumberPushed = false;
