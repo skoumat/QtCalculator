@@ -45,7 +45,7 @@ signals:
 
 private:
     char whiteChar = '_';
-    int decimalCounter = 0;
+    int decimalCounter = -1;
     double currentNumber = 0;
     bool isCurrentNumberPushed = false;
     bool planDeleteCalculation = false;
@@ -69,7 +69,7 @@ private:
     int calculateMultAndDiv(int, int, int);
     int calculateAddAndSub(int, int, int);
 
-    int numDigits(int);
+    int numDigits(QString);
 };
 
 #endif // CALCLOGIC_H

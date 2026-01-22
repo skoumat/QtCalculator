@@ -29,7 +29,8 @@ void CalcLogic::insertDigit(int digit)
         return;
     }
 
-    if (decimalCounter > 0){
+    if (decimalCounter > -1){
+        decimalCounter++;
         if (digit == 0){
             currentNumberString_private.append("0");
             emit currentNumberStringChanged();
@@ -39,7 +40,7 @@ void CalcLogic::insertDigit(int digit)
             currentNumberChanged();
         }
 
-        decimalCounter++;
+
     }
     else {
         currentNumber = currentNumber * 10 + digit;
@@ -58,8 +59,8 @@ void CalcLogic::insertDecimal(){
         planDeleteCalculation = false;
     }
 
-    if (decimalCounter == 0){
-        decimalCounter = 1;
+    if (decimalCounter == -1){
+        decimalCounter = 0;
         currentNumberString_private.append(".");
         emit currentNumberStringChanged();
 
@@ -69,7 +70,13 @@ void CalcLogic::insertDecimal(){
 }
 
 void CalcLogic::currentNumberChanged(){
-    currentNumberString_private = QString::number(currentNumber);
+    if (decimalCounter >= 0){
+        currentNumberString_private = QString::number(currentNumber, 'f', decimalCounter);
+    }
+    else{
+        currentNumberString_private = QString::number(currentNumber, 'f', 0);
+    }
+
     emit currentNumberStringChanged();
 }
 
@@ -97,20 +104,13 @@ void CalcLogic::insertParth(const QString &par){
     }
 
     if (par == ")"){
-        //if(lastWas.back() == OPERAND){
-        //    calculationString_private.append(QString::number(currentNumber));
-        //    emit calculationStringChanged();
-        //    pushCurrentNumber();
-        //}
-
-        //if(lastWas.back() == PARTH && storedOperands.back() == "("){
-        //    storedValues.push_back(currentNumber);
-        //    calculationString_private.append(QString::number(currentNumber));
-        //    emit calculationStringChanged();
-        //}
-
         if (!isCurrentNumberPushed && storedOperands[storedOperands.size() - 1] != ")"){ // zabranuje ..4) 4 +
-            calculationString_private.append(QString::number(currentNumber));
+            if (decimalCounter >= 0){
+                calculationString_private.append(QString::number(currentNumber, 'f', decimalCounter));
+            }
+            else{
+                calculationString_private.append(QString::number(currentNumber, 'f', 0));
+            }
 
             pushAndResetCurrentNumber();
 
@@ -123,8 +123,6 @@ void CalcLogic::insertParth(const QString &par){
 
         neededClosedPar--;
     }
-
-
 
     calculationString_private.append(whiteChar + par + whiteChar);
     emit calculationStringChanged();
@@ -146,7 +144,12 @@ void CalcLogic::insertOperation(const QString &op)
     }
 
     if (!isCurrentNumberPushed){
-        calculationString_private.append(QString::number(currentNumber) + whiteChar + op + whiteChar);
+        if (decimalCounter >= 0){
+            calculationString_private.append(QString::number(currentNumber, 'f', decimalCounter) + whiteChar + op + whiteChar);
+        }
+        else{
+            calculationString_private.append(QString::number(currentNumber, 'f', 0) + whiteChar + op + whiteChar);
+        }
 
         pushAndResetCurrentNumber();
         isCurrentNumberPushed = false;
@@ -174,7 +177,7 @@ void CalcLogic::pushAndResetCurrentNumber(){
     currentNumberChanged();
 
     decimalHistory.push_back(decimalCounter);
-    decimalCounter = 0;
+    decimalCounter = -1;
 }
 
 bool CalcLogic::isDivisionByZeroFromCurrentNum(){
@@ -220,14 +223,14 @@ void CalcLogic::backspace(){ // 0.000001 B -> 0
     }
 
     if(lastWas.back() == Items::DP){
-        decimalCounter = 0;
+        decimalCounter = -1;
 
         currentNumberString_private.removeLast();
         emit currentNumberStringChanged();
     }
 
     if(lastWas.back() == Items::DIGIT){
-        if (currentNumber == 0 && decimalCounter == 0){
+        if (currentNumber == 0 && decimalCounter == -1){
             lastWas.pop_back();
             justDeleted = true;
             backspace();
@@ -236,22 +239,24 @@ void CalcLogic::backspace(){ // 0.000001 B -> 0
 
         if (decimalCounter > 0){
             decimalCounter--;
-            currentNumber = std::trunc(currentNumber * std::pow(10.0, decimalCounter-1)) / std::pow(10.0, decimalCounter-1);
+            currentNumber = std::trunc(currentNumber * std::pow(10.0, decimalCounter)) / std::pow(10.0, decimalCounter);
 
             if (currentNumber == 0){
                 currentNumberString_private.removeLast();
                 emit currentNumberStringChanged();
+
+                lastWas.pop_back();
+                justDeleted = true;
+                return;
             }
+
+            currentNumberString_private = QString::number(currentNumber, 'f', decimalCounter);
         }
         else{
             currentNumber = std::floor(currentNumber/10);
+            currentNumberString_private = QString::number(currentNumber, 'f', 0);
         }
 
-        currentNumberString_private = QString::number(currentNumber);
-
-        if (decimalCounter == 1){
-            currentNumberString_private.append(".");
-        }
         emit currentNumberStringChanged();
     }
 
@@ -265,7 +270,7 @@ void CalcLogic::backspace(){ // 0.000001 B -> 0
         }
         else{
             currentNumber = 0;
-            decimalCounter = 0;
+            decimalCounter = -1;
         }
     }
 
@@ -273,18 +278,15 @@ void CalcLogic::backspace(){ // 0.000001 B -> 0
     justDeleted = true;
 }
 
-int CalcLogic::numDigits(int number)
+int CalcLogic::numDigits(QString numberString)
 {
-    if (number == 0){
-        return 1;
+    for (int i = 0; i < numberString.size() - 1; i++){
+        if (numberString[i] == '.'){
+            return numberString.size() - 1;
+        }
     }
 
-    int digits = 0;
-    while (number) {
-        number /= 10;
-        digits++;
-    }
-    return digits;
+    return numberString.size();
 }
 
 void CalcLogic::restoreCurrentNumber(){
@@ -297,7 +299,14 @@ void CalcLogic::restoreCurrentNumber(){
 
     isCurrentNumberPushed = false;
 
-    calculationString_private.chop(numDigits(currentNumber * std::pow(10.0, decimalCounter)));
+    if(decimalCounter > 0){
+        calculationString_private.chop(numDigits(QString::number(currentNumber, 'f', decimalCounter)));
+    }
+    else{
+        calculationString_private.chop(numDigits(QString::number(currentNumber, 'f', 0)));
+    }
+
+
 
     emit calculationStringChanged();
 }
@@ -318,7 +327,13 @@ void CalcLogic::calculate()
         calculationString_private.append(" =");
     }
     else{
-        calculationString_private.append(QString::number(currentNumber) + " =");
+        if(decimalCounter > 0){
+            calculationString_private.append(QString::number(currentNumber, 'f', decimalCounter) + " =");
+        }
+        else{
+            calculationString_private.append(QString::number(currentNumber, 'f', 0) + " =");
+        }
+
         emit calculationStringChanged();
         pushAndResetCurrentNumber();
     }
@@ -430,7 +445,7 @@ void CalcLogic::clear()
     currentNumber = 0;
     currentNumberChanged();
 
-    decimalCounter = 0;
+    decimalCounter = -1;
     decimalHistory.clear();
 
     storedValues.clear();

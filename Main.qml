@@ -96,7 +96,7 @@ Window {
 
                         horizontalAlignment: Text.AlignRight
 
-                        wrapMode: Text.Wrap
+                        elide: Text.ElideLeft
 
                         text: calculator.currentNumberString
                     }
